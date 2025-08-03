@@ -32,7 +32,7 @@ Vec2 buffer[BUFFERLEN] = {0};	// 8k buffer to mess about with
 
 void crlf()
 {
-	bios_conout('\n');
+	bios_puts("\r\n");
 }
 
 void quit()
@@ -168,7 +168,7 @@ void main()
 	set_interrupt(&interrupt);
 	crlf();
 
-	bios_puts("Press SPACE to play...\n");
+	bios_puts("Press SPACE to play...\r\n");
 	while (bios_const() != ' ') {
 		++seed;
 	}
