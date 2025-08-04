@@ -1,8 +1,9 @@
 #ifndef VDP_H_
 #define VDP_H_
 #include <stdint.h>
+#include <stdbool.h>
 
-#define FRAMEBUF 	*(char*)0xC000
+#define FRAMEBUF 	*(char*)0xC000 // Framebuffer in high ram.
 #define VDP_RAM         *(char*)0xBF30
 #define VDP_REG         *(char*)0xBF31
 #define PATTERN_TABLE   0x800
@@ -27,6 +28,6 @@
 uint8_t vdp_plot_xy(uint8_t, uint8_t, uint8_t);
 void vdp_colorize(uint8_t);
 void __fastcall__ vdp_flush(char *);
-extern uint8_t drawflag;
+extern bool drawflag;
 extern char* framebuf;
 #endif

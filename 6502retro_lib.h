@@ -2,8 +2,8 @@
 #define RETRO_LIB_H_
 #include <stdint.h>
 
-#define rambankreg *(char*)0xBF00
-#define bufferbank 1
+#define rambankreg *(char*)0xBF00	// hardware register for setting RAM BANK
+#define bufferbank 1	// The framebuffer will be in bank #1 of HIGH RAM
 
 extern void vdp_reset();
 extern void __fastcall__ vdp_set_read_addr(uint16_t);
@@ -14,5 +14,6 @@ extern void vdp_wait();
 extern void set_interrupt(void*);
 extern void reset_interrupt();
 extern void sn_play_note();
+extern void sn_play_noise();
 
 #endif //RETRO_LIB_H_

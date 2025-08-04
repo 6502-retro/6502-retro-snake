@@ -7,8 +7,7 @@
 .export _vdp_reset, _vdp_set_write_addr, _vdp_set_read_addr, _vdp_wait
 .export _vdp_flush, _vdp_xy_to_offset, _vdp_clear_pattern_table
 .export _set_interrupt, _reset_interrupt
-.export _sn_play_note
-.export _drawflag
+.export _sn_play_note, _sn_play_noise
 
 .autoimport
 
@@ -54,7 +53,22 @@ _sn_play_note:
     jsr bios_sn_send
     rts
 
-; reset vdp into MC mode
+_sn_play_noise:
+    lda #4
+    ora #(FIRST|CHAN_N)
+    jsr bios_sn_send
+    lda #(FIRST|CHAN_N|VOL|VOL_MAX)
+    jsr bios_sn_send
+    rts
+
+; reset vdp into MC mode and set up the nametable with 6 banks each with 4 rows of the same values.
+; 0-31    (x4)
+; 32-63   (x4)
+; 64-95   (x4)
+; 96-127  (x4)
+; 128-159 (x4)
+; 160-192 (x4)
+; = 768 nametable positions.
 _vdp_reset:
     set_framebuffer_bank
     jsr vdp_clear_vram
@@ -76,7 +90,6 @@ _vdp_reset:
     lda v2+0
 @lpcol:
     sta VDP_RAM
-    slow
     inc
     dex
     bne @lpcol
@@ -94,6 +107,13 @@ _vdp_reset:
     reset_rambank
     rts
 
+; The system interrupt handler calls a routine that jmps to a
+; vector defined at `bios_userieq_vec`.; By default this vector
+; points to a function that simply returns.  Here we save the original
+; vector so it can be restored later and update it with a pointer
+; to our own handler.
+; INPUT: XA = Pointer to custom user interrupt routine
+; OUTPUT: VOID
 _set_interrupt:
     sta v1+0
     stx v1+1
@@ -108,6 +128,9 @@ _set_interrupt:
     sta bios_userirq_vec + 1
     rts
 
+; restore the original userirq_vector.
+; INPUT: VOID
+; OUTPUT: VOID
 _reset_interrupt:
     lda old_irq_vec + 0
     sta bios_userirq_vec + 0
@@ -135,7 +158,11 @@ vdp_clear_vram:
     reset_rambank
     rts
 
-; XA = pointer to framebuffer
+; Copy 0x600 bytes of data from the framebuffer pointed to by XA
+; to the VDP Pattern Generator Table.  This is how a flush works in
+; multicolor mode.
+; INPUT: XA = pointer to framebuffer
+; OUTPUT: VOID
 _vdp_flush:
     sta v1+0
     stx v1+1
@@ -170,6 +197,10 @@ _vdp_set_write_addr:
     fast
     rts
 
+; Sets the VDP internal VRAM pointer for reading.
+; INPUT: A is the low byte of the VRAM address.
+;        X is the high byte of the VRAM address.
+; OUTPUT: VOID
 _vdp_set_read_addr:
     sta VDP_REG             ; As per the TI Programmers Guide.
     fast
@@ -177,6 +208,9 @@ _vdp_set_read_addr:
     fast
     rts
 
+; Sets all the doublepixels in multicolor mode to black.
+; INPUT: VOID
+; OUTPUT: VOID
 _vdp_clear_pattern_table:
     set_framebuffer_bank
     lda #<VDP_PATTERN
@@ -184,7 +218,7 @@ _vdp_clear_pattern_table:
     jsr _vdp_set_write_addr
     lda #$11
     ldy #$00
-    ldx #$04
+    ldx #$06
 :   sta VDP_RAM
     iny
     bne :-
@@ -193,7 +227,10 @@ _vdp_clear_pattern_table:
     reset_rambank
     rts
 
-
+; Calculate the framebuffer index for a pixel given in 64x32 coordinate space
+; addr = (8 * (x / 2)) + (y % 8) + (256 * (y / 8));
+; INPUT: XA = X = X coordinate, A = Y coordinate
+; OUTPUT: XA = 16bit offset into framebuffer
 _vdp_xy_to_offset:
     tay
     div8
@@ -212,13 +249,13 @@ _vdp_xy_to_offset:
     ldx v2+1
     rts
 
-
 ; initialize vdp in Multicolour mode (64x48)
 vdp_init_mc:
     lda #<mc_regs
     ldx #>mc_regs
     jmp _init_regs
 
+; Waits for the VDP Interrupt to fire.
 _vdp_wait:
     bit VDP_SYNC            ; vdp_sync is set by the interrupt handler to 0x80
     bpl _vdp_wait
@@ -247,14 +284,7 @@ _init_regs:
     bne :-                  ; loop until complete.
     rts
 
-interrupt:
-    lda #<FRAMEBUF
-    ldx #>FRAMEBUF
-    jsr _vdp_flush
-    rts
-
-old_irq_vec: .word 0
-_drawflag: .byte 0
+old_irq_vec: .word 0        ; Storage for original interrupt vector
 
 .rodata
 ; These are the registers for the multicolour mode
