@@ -21,4 +21,5 @@ extern void bios_sn_start();
 extern void bios_sn_stop();
 extern void bios_sn_send();
 
+extern uint8_t notectr;
 #endif

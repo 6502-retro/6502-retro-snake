@@ -9,6 +9,8 @@
 .export _set_interrupt, _reset_interrupt
 .export _sn_play_note, _sn_play_noise
 
+.export _notectr := notectr
+
 .autoimport
 
 FIRST   = %10000000
@@ -24,6 +26,8 @@ VOL_MAX = %00000000
 
 FRAMEBUF = $C000
 FRAMEBUFBANK = 1
+
+
 .zeropage
 
 v1: .word 0
