@@ -4,8 +4,8 @@
 #include <stdbool.h>
 
 #define FRAMEBUF 	*(char*)0xC000 // Framebuffer in high ram.
-#define VDP_RAM         *(char*)0xBF30
-#define VDP_REG         *(char*)0xBF31
+#define VDP_RAM         *(char*)0xBF40
+#define VDP_REG         *(char*)0xBF41
 #define PATTERN_TABLE   0x800
 
 #define VDP_TRANSPARENT         0

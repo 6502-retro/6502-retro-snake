@@ -47,7 +47,7 @@ bool vdp_plot_xy(uint8_t x, uint8_t y, uint8_t c) {
         pix = (dot & 0x0F) | (c<<4);
     }
     framebuf[addr] = pix;
-    rambankreg = 0;                 // reset the ram bank to 0
+    rambankreg = 0x80;                 // reset the ram bank to 0
     return collide;
 }
 
@@ -56,7 +56,7 @@ void vdp_colorize(uint8_t c) {
     uint8_t b = c<<4 | c;           // The colour is 0x?? for both left and right pixels in the double-pixel
     rambankreg = bufferbank;
     memset(framebuf, b, 0x600);
-    rambankreg = 0;
+    rambankreg = 0x80;
 }
 
 // vim: ts=4 sw=4 et:

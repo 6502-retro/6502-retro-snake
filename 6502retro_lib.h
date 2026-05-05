@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #define rambankreg *(char*)0xBF00	// hardware register for setting RAM BANK
-#define bufferbank 1	// The framebuffer will be in bank #1 of HIGH RAM
+#define bufferbank 0x81	// The framebuffer will be in bank #1 of HIGH RAM
 
 extern void vdp_reset();
 extern void __fastcall__ vdp_set_read_addr(uint16_t);

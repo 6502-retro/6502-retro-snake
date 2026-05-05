@@ -9,7 +9,6 @@
 .export _set_interrupt, _reset_interrupt
 .export _sn_play_note, _sn_play_noise
 
-.export _notectr := notectr
 
 .autoimport
 
@@ -25,7 +24,7 @@ VOL_OFF = %00001111
 VOL_MAX = %00000000
 
 FRAMEBUF = $C000
-FRAMEBUFBANK = 1
+FRAMEBUFBANK = $81
 
 
 .zeropage
@@ -37,11 +36,12 @@ v3: .word 0
 
 .macro set_framebuffer_bank
     lda #FRAMEBUFBANK
-    sta RAMBANKREG
+    sta rambankreg
 .endmacro
 
 .macro reset_rambank
-    stz RAMBANKREG
+    lda #$80
+    sta rambankreg
 .endmacro
 
 .code
@@ -93,7 +93,7 @@ _vdp_reset:
     ldx #32
     lda v2+0
 @lpcol:
-    sta VDP_RAM
+    sta vdp_ram
     inc
     dex
     bne @lpcol
@@ -153,7 +153,7 @@ vdp_clear_vram:
     lda #0                  ; A has the value being written to VRAM
     ldy #0                  ; Y is the byte counter
     ldx #$3F                ; X is the page counter
-:   sta VDP_RAM             ; save A into vram
+:   sta vdp_ram             ; save A into vram
     slow
     iny                     ; increment Y and loop until a whole page is written
     bne :-
@@ -179,7 +179,7 @@ _vdp_flush:
     ldy #0
 @lp:
     lda (v1),y
-    sta VDP_RAM
+    sta vdp_ram
     iny
     bne @lp
     inc v1+1
@@ -193,11 +193,11 @@ _vdp_flush:
 ;        X is the high byte of the VRAM address.
 ; OUTPUT: VOID
 _vdp_set_write_addr:
-    sta VDP_REG             ; As per the TI Programmers Guide.
+    sta vdp_reg             ; As per the TI Programmers Guide.
     fast
     txa
     ora #$40
-    sta VDP_REG
+    sta vdp_reg
     fast
     rts
 
@@ -206,9 +206,9 @@ _vdp_set_write_addr:
 ;        X is the high byte of the VRAM address.
 ; OUTPUT: VOID
 _vdp_set_read_addr:
-    sta VDP_REG             ; As per the TI Programmers Guide.
+    sta vdp_reg             ; As per the TI Programmers Guide.
     fast
-    stx VDP_REG
+    stx vdp_reg
     fast
     rts
 
@@ -223,7 +223,7 @@ _vdp_clear_pattern_table:
     lda #$11
     ldy #$00
     ldx #$06
-:   sta VDP_RAM
+:   sta vdp_ram
     iny
     bne :-
     dex
@@ -277,11 +277,11 @@ _init_regs:
     stx v3+1
     ldy #0                  ; Y is the offset in the register table.
 :   lda (v3),y            ; load the first byte
-    sta VDP_REG             ; save to VRAM
+    sta vdp_reg             ; save to VRAM
     fast
     tya                     ; use the pointer offset to set the VDP register
     ora #$80                ; As per the TI Programmers manual.
-    sta VDP_REG
+    sta vdp_reg
     fast
     iny
     cpy #8                  ; there are 8 registers altogether 0-7

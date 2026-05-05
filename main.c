@@ -213,12 +213,15 @@ void main()
 	bios_sn_start();
 	vdp_reset();
 	vdp_colorize(VDP_BLACK);
-	set_interrupt(&interrupt);	// Our user defined interrupt routine.
+  bios_puts("4");
+  set_interrupt(&interrupt);	// Our user defined interrupt routine.
+  bios_puts("5");
 	crlf();
+  bios_puts("6");
 
 	// Increment the seed seed until the user presses SPACE.
 	// This provides some semblance of randomness between plays
-	bios_puts("Press SPACE to play...\r\n");
+  bios_puts("Press SPACE to play...\r\n");
 	while (bios_const() != ' ') {
 		++seed;
 	}

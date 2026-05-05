@@ -1,8 +1,5 @@
 ; vim: set ft=asm_ca65 ts=4 sw=4 et:
 ; IO Ports
-VDP_RAM                 = $BF30
-VDP_REG                 = $BF31
-
 ; colours
 VDP_TRANSPARENT         = 0
 VDP_BLACK               = 1
