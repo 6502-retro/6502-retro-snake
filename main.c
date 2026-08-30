@@ -7,15 +7,22 @@
 #include "bios.h"
 
 /*
-* A 1536 byte buffer to hold the head and tail positions of the snake.
-* As the snake grows, the distance between the head and tail will grow too.
-* The snake grows by 5 pixels every apple eaten.  This means that the buffer must support
-* at least 1536 / (size of Vec2) (768) apples before the head wraps and overtakes the tail.
-* Maximum length of snake is 3840.  Max pixels at 64x48 is 3072, so this buffer size is fine.
+* A circular buffer that holds the head and tail positions of the snake.
+* As the snake grows, the distance between the head and the tail grows too,
+* because every apple eaten stalls the tail for GROWLEN moves.  The ring must
+* therefore be at least as large as the longest possible snake, which can never
+* be longer than the number of playfield cells (64 * 48 = 3072).  BUFFERLEN
+* holds one Vec2 per cell (3072 Vec2 = 6144 bytes).  The game is won on the
+* last possible apple: ((64 * 48) - 5) / 5 = 613 apples = 3070 segments.
 */
-#define BUFFERLEN 0x600
-#define GROWLEN 5  // How many segments should the snake grow when it eats an apple
-#define GAMESPEED 4  // game runs at ~15 frames per second
+#define GRID_W      64
+#define GRID_H      48
+#define GRID_CELLS  (GRID_W * GRID_H)
+#define BUFFERLEN   (GRID_CELLS)  // Ring must hold the longest possible snake
+#define STARTING_LEN 5            // Initial snake length in segments
+#define GROWLEN     5             // How many segments the snake grows when it eats an apple
+#define MAX_APPLES  ((GRID_CELLS - STARTING_LEN) / GROWLEN)  // Last apple -> board is full
+#define GAMESPEED   4             // game runs at ~15 frames per second
 
 enum e_dir {
   NORTH,     // 0
@@ -47,10 +54,15 @@ typedef struct {
 
 Vec2 buffer[BUFFERLEN] = {0}; // circular buffer of vector 2 locations.
 
+// Advance a ring pointer by one slot, wrapping around the end of the buffer.
+#define RING_NEXT(p) ((p) == &buffer[BUFFERLEN-1] ? &buffer[0] : (p) + 1)
+
 // Use globals for CA65 performance
 size_t seed = 0;
 Vec2 apple;
 Snake *snake;
+static Snake snake_buf;   // Backing store that `snake` points at
+bool won = false;         // True once the last apple has been eaten
 uint8_t dir, k;
 uint8_t gamespeed = 4;
 uint8_t running = false;
@@ -95,6 +107,24 @@ void fatal(char *msg)
   quit();
 }
 
+// Flash the screen, play a note and report the score when the snake has
+// eaten the last possible apple and filled the playfield.
+void victory()
+{
+  VDP_REG = 0x16;
+  VDP_REG = 0x87;
+  sn_play_note();
+  notectr = 15;
+  delay(15);
+  bios_puts("YOU WIN!");
+  crlf();
+  printf("SCORE: %d", score);
+  crlf();
+  VDP_REG = 0x1a;
+  VDP_REG = 0x87;
+  quit();
+}
+
 // flush the screen if required by drawflag == true when the VDP interrupt fires
 void interrupt()
 {
@@ -125,12 +155,12 @@ Vec2 new_apple()
 // Initializes the snake to it's starting position, length and direction.
 Snake *new_snake()
 {
-  Snake *s;
+  Snake *s = &snake_buf;
   Vec2 v;
   uint8_t i;
-  memset(&buffer, 0, BUFFERLEN);
+  memset(&buffer, 0, sizeof(buffer));
 
-  for (i=0; i<5; ++i)   // add 5 segments to the circular buffer
+  for (i=0; i<STARTING_LEN; ++i)   // add starting segments to the circular buffer
   {
     v.x = 27+i;
     v.y = 24;
@@ -180,22 +210,15 @@ void move_snake(Snake *s, uint8_t dir)
     fatal("CRASHED INTO WALL");
   }
 
-  if (s->head < &buffer[BUFFERLEN]-sizeof(Vec2)) {
-    s->head++;
-    s->neck++;
-    s->body++;
-  } else {
-    s->head = &buffer[0];
-    s->neck = &buffer[BUFFERLEN]-2;
-    s->body = &buffer[BUFFERLEN]-6;
-  }
+  // Advance head, neck and body by one ring slot.  Neck and body are the
+  // segments one and three slots behind the head, so each wraps independently.
+  s->head = RING_NEXT(s->head);
+  s->neck = RING_NEXT(s->neck);
+  s->body = RING_NEXT(s->body);
 
   if (s->grow == 0)
   {
-    if (s->tail < &buffer[BUFFERLEN]-sizeof(Vec2))
-      s->tail++;
-    else
-      s->tail = &buffer[0];
+    s->tail = RING_NEXT(s->tail);
   }
   else
   {
@@ -236,6 +259,7 @@ void main()
 
   running = true;     // Game play continues until `running` is false
   srand(seed);      // Init random number generator with collected seed
+  won = false;      // The winning condition has not been met yet
   snake = new_snake();    // Init snake
   dir = EAST;     // Initial direction is always EAST
   draw_snake(snake);    // Draw snake once
@@ -269,12 +293,16 @@ void main()
           (snake->head->x == apple.x) &&
           (snake->head->y == apple.y)
         )
-        { // Draw new apple and start growing the snake.  The tail is not
-          apple = new_apple();    // advanced until growlen returns to 0.
-          snake->grow = GROWLEN;  // See `move_snake()`
+        { // Start growing the snake.  The tail is not advanced until
+          // growlen returns to 0.  See `move_snake()`
+          snake->grow = GROWLEN;
           score ++;     // increment score
           sn_play_note();
           notectr = 4;
+          if (score >= MAX_APPLES)  // last apple eaten - game is won
+            won = true;
+          else
+            apple = new_apple();    // Draw a new apple
         }
         else
         {
@@ -289,6 +317,8 @@ void main()
       */
       drawflag = true;
       gamespeed = GAMESPEED;
+      if (won && snake->grow == 0)  // final growth complete - board is full
+        victory();
     }
   }
   crlf();
